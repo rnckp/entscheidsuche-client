@@ -1,8 +1,8 @@
-# entscheidsuche
+# Entscheidsuche Python Client
 
-Independent Python client for accessing the [entscheidsuche.ch](https://entscheidsuche.ch) API and Swiss court decision data more easily.
+**Independent Python client for accessing the [entscheidsuche.ch](https://entscheidsuche.ch) API and Swiss court decision data more easily.**
 
-This project is not official, or associated with entscheidsuche.ch. It was developed independently as a convenience wrapper around publicly reachable entscheidsuche.ch endpoints. 
+This project is not official, or associated with entscheidsuche.ch. It was developed independently as a convenience wrapper around publicly reachable entscheidsuche.ch endpoints.
 
 ## Installation
 
@@ -26,7 +26,7 @@ with EntscheidsucheClient() as client:
     # Get document metadata and content
     doc = client.get_document_json("CH_BGE", "CH_BGE_001_BGE-86-I-226_1960-10-20")
     html = client.get_document_html("CH_BGE", "CH_BGE_001_BGE-86-I-226_1960-10-20")
-    
+
     # Download all formats
     client.download_document("CH_BGE", "CH_BGE_001_BGE-86-I-226_1960-10-20", output_dir="./downloads")
 ```
@@ -115,8 +115,13 @@ EntscheidsucheClient.get_canton_name("ZH")  # "Zürich"
 
 ## Fair Use
 
-This independent client accesses entscheidsuche.ch endpoints. Please be kind to the server, mention entscheidsuche.ch as the data source when appropriate, and consider supporting entscheidsuche.ch if using the data commercially.
+This independent client accesses entscheidsuche.ch endpoints.
+
+> [!IMPORTANT]
+> Please be kind to the server, mention entscheidsuche.ch as the data source when appropriate, and **consider supporting entscheidsuche.ch if using the data commercially.**
 
 ## License
 
-MIT
+This Python client is licensed under the MIT License.
+
+The MIT License applies only to this client code. It does not apply to Entscheidsuche data, API content, court decisions, or other source materials returned by the service. For data and content licensing details, consult [Entscheidsuche](https://entscheidsuche.ch) and the respective original data sources.
