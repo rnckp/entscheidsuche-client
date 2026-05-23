@@ -1,0 +1,13 @@
+entscheidsuche:
+  base_url: "https://entscheidsuche.ch"
+  docs_url: "https://entscheidsuche.ch/docs"
+  search_url: "https://entscheidsuche.ch/_search.php"
+  timeout: 30.0
+  rate_limit_delay: 0.5
+  default_search_size: 10
+  default_sort_order: "desc"
+  default_download_formats:
+    - "json"
+    - "html"
+    - "pdf"
+  default_date_output_format: "%d.%m.%Y"

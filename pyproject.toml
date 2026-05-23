@@ -1,0 +1,34 @@
+[project]
+name = "entscheidsuche"
+version = "0.1.0"
+description = "Independent Python client for accessing Swiss court decisions from entscheidsuche.ch"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "httpx>=0.27.0",
+    "pyyaml>=6.0.3",
+]
+
+[project.urls]
+Homepage = "https://github.com/rnckp/entscheidsuche"
+Repository = "https://github.com/rnckp/entscheidsuche"
+Issues = "https://github.com/rnckp/entscheidsuche/issues"
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.1.0",
+    "jupyter>=1.0.0",
+    "pandas>=2.3.3",
+    "pytest>=8.0.0",
+    "ruff>=0.14.13",
+]
+
+[tool.uv]
+exclude-newer = "7 days"
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["entscheidsuche*"]
