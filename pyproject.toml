@@ -1,5 +1,5 @@
 [project]
-name = "entscheidsuche"
+name = "entscheidsuche-client"
 version = "0.1.0"
 description = "Independent Python client for accessing Swiss court decisions from entscheidsuche.ch"
 readme = "README.md"
@@ -10,9 +10,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/rnckp/entscheidsuche"
-Repository = "https://github.com/rnckp/entscheidsuche"
-Issues = "https://github.com/rnckp/entscheidsuche/issues"
+Homepage = "https://github.com/rnckp/entscheidsuche-client"
+Repository = "https://github.com/rnckp/entscheidsuche-client"
+Issues = "https://github.com/rnckp/entscheidsuche-client/issues"
 
 [dependency-groups]
 dev = [
