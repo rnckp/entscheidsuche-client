@@ -1,6 +1,6 @@
 # Entscheidsuche Python Client
 
-**Independent Python client for accessing the [entscheidsuche.ch](https://entscheidsuche.ch) API and Swiss court decision data more easily.**
+**Python client for accessing the [entscheidsuche.ch](https://entscheidsuche.ch) API and Swiss court decision data more easily.**
 
 This project is not official, or associated with entscheidsuche.ch. It was developed independently as a convenience wrapper around publicly reachable entscheidsuche.ch endpoints.
 
