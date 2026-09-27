@@ -76,10 +76,10 @@ class EntscheidsucheClient:
     - Get the blocklist of removed documents
 
     Example:
-        >>> client = EntscheidsucheClient()
-        >>> results = client.search("Mietvertrag")
-        >>> for hit in results.hits:
-        ...     print(hit.signatur, hit.date)
+        >>> with EntscheidsucheClient() as client:
+        ...     results = client.search("Mietvertrag")
+        ...     for hit in results.hits:
+        ...         print(hit.signatur, hit.date)
     """
 
     def __init__(
@@ -168,7 +168,7 @@ class EntscheidsucheClient:
 
         Args:
             query: Search query string.
-            size: Number of results to return (default 10, max 10000).
+            size: Requested page size (configured default, built-in 10; range 0–10000).
             from_: Offset for pagination.
             canton: Filter by canton code (e.g., "ZH", "BE").
             spider: Filter by spider/scraper name.
@@ -176,7 +176,7 @@ class EntscheidsucheClient:
             date_from: Filter by minimum date (YYYY-MM-DD).
             date_to: Filter by maximum date (YYYY-MM-DD).
             sort_by: Field to sort by (e.g., "date", "_score").
-            sort_order: Sort order ("asc" or "desc").
+            sort_order: Sort order (configured default, built-in "desc").
 
         Returns:
             SearchResult containing hits and metadata.
@@ -261,10 +261,10 @@ class EntscheidsucheClient:
 
         Args:
             spider: Spider/scraper name (e.g., "CH_BGE").
-            signatur: Document signature.
+            signatur: Full document ID, such as SearchHit.signatur.
 
         Returns:
-            CaseDocument with all metadata.
+            CaseDocument with the metadata fields retained by the model.
         """
         _validate_identifier(spider, "spider")
         _validate_identifier(signatur, "signatur")
@@ -286,7 +286,7 @@ class EntscheidsucheClient:
 
         Args:
             spider: Spider/scraper name.
-            signatur: Document signature.
+            signatur: Full document ID, such as SearchHit.signatur.
 
         Returns:
             HTML content as string.
@@ -304,7 +304,7 @@ class EntscheidsucheClient:
 
         Args:
             spider: Spider/scraper name.
-            signatur: Document signature.
+            signatur: Full document ID, such as SearchHit.signatur.
 
         Returns:
             PDF content as bytes.
@@ -328,10 +328,13 @@ class EntscheidsucheClient:
 
         Args:
             spider: Spider/scraper name.
-            signatur: Document signature.
+            signatur: Full document ID, such as SearchHit.signatur.
             output_dir: Directory to save files.
             formats: List of formats to download ("json", "html", "pdf").
-                     If None, downloads all available formats.
+                     If None, uses the configured list (built-in: JSON, HTML, PDF).
+
+        Existing files are overwritten. HTTP 404s are skipped for any format;
+        other errors propagate without rolling back files already written.
 
         Returns:
             Dict mapping format to saved file path.
@@ -401,7 +404,7 @@ class EntscheidsucheClient:
             spider: Spider/scraper name.
 
         Returns:
-            JobsFile with all document statuses.
+            JobsFile mapping the response's signaturen field to documents.
         """
         _validate_identifier(spider, "spider")
         url = f"{self.docs_url}/Jobs/{_quote_segment(spider)}/last"
@@ -434,7 +437,7 @@ class EntscheidsucheClient:
 
     def list_documents(self, spider: str) -> list[str]:
         """
-        List all document files for a spider.
+        Collect document links from a spider's HTML directory listing.
 
         Note: This parses the HTML directory listing which may include
         outdated files that are no longer indexed.
@@ -443,7 +446,7 @@ class EntscheidsucheClient:
             spider: Spider/scraper name.
 
         Returns:
-            List of filenames in the spider's directory.
+            Sorted, unique href values ending in .json, .html, or .pdf.
         """
         _validate_identifier(spider, "spider")
         url = f"{self.docs_url}/{_quote_segment(spider)}/"

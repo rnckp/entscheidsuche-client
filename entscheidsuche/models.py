@@ -77,8 +77,7 @@ class ScraperInfo:
 
     @classmethod
     def from_status_line(cls, name: str, line: str) -> "ScraperInfo":
-        """Parse scraper info from status page line."""
-        # This is a simplified parser - actual parsing depends on HTML structure
+        """Return placeholder counts and unknown status; line is not parsed."""
         return cls(
             name=name,
             document_count=0,
@@ -230,7 +229,7 @@ class IndexFile:
 
 @dataclass(config=_MODEL_CONFIG)
 class JobsFile:
-    """Jobs file containing all documents for a scraper."""
+    """Jobs response mapping document keys to per-format status data."""
 
     jobtyp: str
     time: str
@@ -271,7 +270,7 @@ class SearchHit:
 
     @property
     def signatur(self) -> str:
-        """Get document signature (from _id or source)."""
+        """Get full document ID from source id, _id, or legacy Signatur."""
         return self.source.get("id") or self.id or self.source.get("Signatur", "")
 
     @property

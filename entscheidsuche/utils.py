@@ -15,16 +15,18 @@ def parse_case_number(case_number: str) -> dict[str, str | None]:
     """
     Parse a Swiss case number into its components.
 
-    Swiss case numbers typically follow patterns like:
+    Recognized patterns:
     - "4A_123/2023" (Federal Court)
     - "A-1234/2023" (Federal Administrative Court)
-    - "VB.2023.00123" (Cantonal courts)
+
+    Other forms, such as "VB.2023.00123", only yield the first four-digit year.
 
     Args:
         case_number: The case number string.
 
     Returns:
-        Dict with parsed components (court, chamber, number, year).
+        Dict with court, chamber, number, year, and original input. Unrecognized
+        components are None.
     """
     result: dict[str, str | None] = {
         "court": None,

@@ -2,6 +2,12 @@
 
 Instructions for AI agents working on Python projects managed with `uv`. Apply only sections relevant to the task; preserve established project choices unless a migration is requested.
 
+This repository is a synchronous Python client library, with its package in
+`entscheidsuche/` and Python support defined in `pyproject.toml`. The platform,
+web application, database, and agentic-AI sections below are conditional guidance,
+not descriptions of implemented components. See [README.md](README.md) for the
+current structure and [PLAN.md](PLAN.md) for tooling gaps.
+
 ## Priority
 
 When instructions conflict, follow:
@@ -43,7 +49,7 @@ Briefly report any conflict, the rule applied, and its effect.
 - Preserve `[tool.uv] exclude-newer = "7 days"` so newly published packages observe the supply-chain cooldown.
 - For new projects, use `src/<project_name>/` with mirrored tests under `tests/`; preserve existing layouts unless migration is in scope. Separate unit and integration tests when useful.
 - Preferred packages are not available until declared. Obtain approval before `uv add`.
-- Install repository hooks with `uv run pre-commit install` before the first commit.
+- When pre-commit is declared and configured, install repository hooks with `uv run pre-commit install` before the first commit. This repository currently has neither the dependency nor a hook configuration; adding them requires dependency approval.
 
 ## Python Design and Style
 
