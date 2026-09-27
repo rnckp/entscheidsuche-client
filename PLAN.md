@@ -1,0 +1,7 @@
+# Remaining review findings
+
+- **Custom endpoints:** `CaseDocument.html_url`, `pdf_url`, `json_url`, and `SearchHit.to_case_document()` use `DEFAULT_CONFIG.docs_url`, ignoring the client endpoint. Carry endpoint context into returned documents before promising custom-host URL support.
+- **Incomplete features:** `ScraperInfo.from_status_line()` ignores its input and returns zeros/unknown; `cache_dir` has no effect (now documented). Implement or explicitly deprecate these interfaces in a focused change.
+- **Response contracts:** Nested search `_source` and index/job data remain partly open-ended. For example, `hierarchy: null` can fail when accessing `SearchHit.spider`, and malformed index change lists can be interpreted incorrectly. Validate these with representative API fixtures; confirm the documented Jobs shape against the service before release. No live service calls were made during this review.
+- **Repeated downloads:** Downloading all formats fetches metadata three times. Reuse metadata within each download operation, preserving optional-format 404 behavior. Large responses are also buffered entirely in memory; streaming and size limits need an explicit API policy.
+- **Automation:** Dependabot configuration has been added but remote activation is unverified. There is no checked-in CI workflow or pre-commit setup. Adding pre-commit requires dependency approval; any future workflow actions must use full commit SHAs.

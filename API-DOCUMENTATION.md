@@ -319,7 +319,7 @@ results = client.search(
     canton="ZH",
     language="de",
     date_from="2023-01-01",
-    date_to="2023-12-31"
+    date_to="2023-12-31",
 )
 
 # Get documents
@@ -349,14 +349,10 @@ query_body = {
     "query": {
         "bool": {
             "must": [{"match": {"attachment.content": "Arbeitsgericht"}}],
-            "filter": [{"term": {"hierarchy": "ZH"}}]
+            "filter": [{"term": {"hierarchy": "ZH"}}],
         }
     },
-    "aggs": {
-        "by_year": {
-            "date_histogram": {"field": "date", "calendar_interval": "year"}
-        }
-    }
+    "aggs": {"by_year": {"date_histogram": {"field": "date", "calendar_interval": "year"}}},
 }
 
 response = client.search_raw(query_body)

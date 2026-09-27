@@ -5,13 +5,14 @@ Main client for the entscheidsuche.ch API.
 import time
 from html.parser import HTMLParser
 from pathlib import Path
-from typing import Any
-from urllib.parse import quote
+from typing import Any, Self
+from urllib.parse import quote, unquote
 from xml.etree import ElementTree
 
 import httpx
+from pydantic import ConfigDict, TypeAdapter
 
-from .config import load_config
+from .config import EntscheidsucheConfig, load_config
 from .models import (
     CANTONS,
     SCRAPERS,
@@ -21,8 +22,11 @@ from .models import (
     SearchResult,
 )
 
-
 ALLOWED_DOCUMENT_FORMATS = {"json", "html", "pdf"}
+_BLOCKLIST = TypeAdapter(
+    list[str] | dict[str, list[str]],
+    config=ConfigDict(strict=True, hide_input_in_errors=True),
+)
 
 
 class _DirectoryListingParser(HTMLParser):
@@ -49,6 +53,18 @@ def _quote_segment(value: str) -> str:
     return quote(value, safe="")
 
 
+def _validate_document_path(value: str) -> str:
+    """Constrain remote metadata to a relative path below the docs endpoint."""
+    decoded = unquote(value)
+    if (
+        any(character in decoded for character in "\\?#:%")
+        or any(ord(character) < 32 or ord(character) == 127 for character in decoded)
+        or any(part in {"", ".", ".."} for part in decoded.split("/"))
+    ):
+        raise ValueError("Invalid document path in metadata")
+    return "/".join(_quote_segment(part) for part in decoded.split("/"))
+
+
 class EntscheidsucheClient:
     """
     Client for accessing the entscheidsuche.ch API.
@@ -73,35 +89,36 @@ class EntscheidsucheClient:
         cache_dir: Path | None = None,
         config_path: Path | str | None = None,
         transport: httpx.BaseTransport | None = None,
-    ):
+    ) -> None:
         """
         Initialize the client.
 
         Args:
             timeout: Request timeout in seconds.
             rate_limit_delay: Minimum delay between requests in seconds.
-            cache_dir: Optional directory for caching downloaded files.
+            cache_dir: Reserved for future caching; currently has no effect.
             config_path: Optional path to a config.yaml file.
             transport: Optional HTTPX transport, mainly useful for tests.
         """
-        self.config = load_config(config_path)
+        settings = load_config(config_path).model_dump()
+        if timeout is not None:
+            settings["timeout"] = timeout
+        if rate_limit_delay is not None:
+            settings["rate_limit_delay"] = rate_limit_delay
+        self.config = EntscheidsucheConfig.model_validate(settings)
         self.base_url = self.config.base_url.rstrip("/")
         self.docs_url = self.config.docs_url.rstrip("/")
         self.search_url = self.config.search_url
-        self.timeout = timeout if timeout is not None else self.config.timeout
-        self.rate_limit_delay = (
-            rate_limit_delay
-            if rate_limit_delay is not None
-            else self.config.rate_limit_delay
-        )
+        self.timeout = self.config.timeout
+        self.rate_limit_delay = self.config.rate_limit_delay
         self.cache_dir = cache_dir
         self._last_request_time = 0.0
         self._client = httpx.Client(timeout=self.timeout, transport=transport)
 
-    def __enter__(self) -> "EntscheidsucheClient":
+    def __enter__(self) -> Self:
         return self
 
-    def __exit__(self, *args: Any) -> None:
+    def __exit__(self, *args: object) -> None:
         self.close()
 
     def close(self) -> None:
@@ -110,10 +127,10 @@ class EntscheidsucheClient:
 
     def _rate_limit(self) -> None:
         """Apply rate limiting between requests."""
-        elapsed = time.time() - self._last_request_time
+        elapsed = time.monotonic() - self._last_request_time
         if elapsed < self.rate_limit_delay:
             time.sleep(self.rate_limit_delay - elapsed)
-        self._last_request_time = time.time()
+        self._last_request_time = time.monotonic()
 
     def _get(self, url: str) -> httpx.Response:
         """Make a rate-limited GET request."""
@@ -166,6 +183,12 @@ class EntscheidsucheClient:
         """
         result_size = size if size is not None else self.config.default_search_size
         order = sort_order if sort_order is not None else self.config.default_sort_order
+        if type(result_size) is not int or not 0 <= result_size <= 10000:
+            raise ValueError("size must be an integer between 0 and 10000")
+        if type(from_) is not int or from_ < 0:
+            raise ValueError("from_ must be a nonnegative integer")
+        if order not in {"asc", "desc"}:
+            raise ValueError("sort_order must be 'asc' or 'desc'")
         must_clauses: list[dict[str, Any]] = []
         filter_clauses: list[dict[str, Any]] = []
 
@@ -252,9 +275,9 @@ class EntscheidsucheClient:
     def _document_path(self, spider: str, signatur: str, format_: str) -> str:
         document = self.get_document_json(spider, signatur)
         if format_ == "html" and document.html_path:
-            return document.html_path
+            return _validate_document_path(document.html_path)
         if format_ == "pdf" and document.pdf_path:
-            return document.pdf_path
+            return _validate_document_path(document.pdf_path)
         return f"{_quote_segment(spider)}/{_quote_segment(signatur)}.{format_}"
 
     def get_document_html(self, spider: str, signatur: str) -> str:
@@ -320,9 +343,7 @@ class EntscheidsucheClient:
         safe_signatur = _validate_identifier(signatur, "signatur")
         unsupported_formats = sorted(set(formats) - ALLOWED_DOCUMENT_FORMATS)
         if unsupported_formats:
-            raise ValueError(
-                f"Unsupported document formats: {', '.join(unsupported_formats)}"
-            )
+            raise ValueError(f"Unsupported document formats: {', '.join(unsupported_formats)}")
 
         output_dir = Path(output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -400,18 +421,12 @@ class EntscheidsucheClient:
         """
         url = f"{self.docs_url}/Blockliste.json"
         response = self._get(url)
-        data = response.json()
+        data = _BLOCKLIST.validate_python(response.json())
         if isinstance(data, list):
             return data
-        if isinstance(data, dict):
-            if isinstance(data.get("blocked"), list):
-                return data["blocked"]
-            blocked: list[str] = []
-            for values in data.values():
-                if isinstance(values, list):
-                    blocked.extend(str(value) for value in values)
-            return blocked
-        return []
+        if "blocked" in data:
+            return data["blocked"]
+        return [document_id for values in data.values() for document_id in values]
 
     # -------------------------------------------------------------------------
     # Directory Listing
@@ -452,9 +467,7 @@ class EntscheidsucheClient:
         response = self._get(url)
         root = ElementTree.fromstring(response.content)
         return [
-            element.text
-            for element in root.iter()
-            if element.tag.endswith("loc") and element.text
+            element.text for element in root.iter() if element.tag.endswith("loc") and element.text
         ]
 
     # -------------------------------------------------------------------------

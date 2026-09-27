@@ -1,7 +1,23 @@
+from pathlib import Path
+
 import pytest
 
 from entscheidsuche.models import CaseDocument
-from entscheidsuche.utils import build_search_query, get_statistics, save_document_batch
+from entscheidsuche.utils import (
+    build_search_query,
+    format_date,
+    get_statistics,
+    save_document_batch,
+)
+
+
+def test_format_date_does_not_hide_invalid_configuration(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "config.yaml").write_text("unknown_key: 1", encoding="utf-8")
+    with pytest.raises(ValueError, match="Extra inputs"):
+        format_date("2024-01-02")
 
 
 def test_build_search_query_uses_live_search_fields() -> None:
@@ -19,9 +35,7 @@ def test_build_search_query_uses_live_search_fields() -> None:
     assert {"term": {"hierarchy": "ZH"}} in bool_query["filter"]
     assert {"term": {"hierarchy": "ZH_Obergericht"}} in bool_query["filter"]
     assert {"term": {"attachment.language": "de"}} in bool_query["filter"]
-    assert {
-        "range": {"date": {"gte": "2023-01-01", "lte": "2023-12-31"}}
-    } in bool_query["filter"]
+    assert {"range": {"date": {"gte": "2023-01-01", "lte": "2023-12-31"}}} in bool_query["filter"]
 
 
 def test_save_document_batch_rejects_unknown_format(tmp_path) -> None:

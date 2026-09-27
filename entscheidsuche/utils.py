@@ -3,7 +3,7 @@ Utility functions for working with entscheidsuche.ch data.
 """
 
 import re
-from datetime import datetime
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -74,9 +74,7 @@ def extract_text_from_html(html: str) -> str:
         Plain text with HTML tags removed.
     """
     # Remove script and style elements
-    html = re.sub(
-        r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE
-    )
+    html = re.sub(r"<script[^>]*>.*?</script>", "", html, flags=re.DOTALL | re.IGNORECASE)
     html = re.sub(r"<style[^>]*>.*?</style>", "", html, flags=re.DOTALL | re.IGNORECASE)
 
     # Remove HTML tags
@@ -118,10 +116,10 @@ def format_date(date_str: str, output_format: str | None = None) -> str:
         Formatted date string.
     """
     try:
-        dt = datetime.strptime(date_str, "%Y-%m-%d")
-        return dt.strftime(output_format or load_config().default_date_output_format)
+        dt = date.fromisoformat(date_str)
     except ValueError:
         return date_str
+    return dt.strftime(output_format or load_config().default_date_output_format)
 
 
 def filter_by_date_range(
@@ -254,9 +252,7 @@ def search_results_to_dataframe(results: SearchResult) -> Any:
                 "date": hit.date,
                 "language": hit.language,
                 "score": hit.score,
-                "title_de": title.get("de", "")
-                if isinstance(title, dict)
-                else str(title),
+                "title_de": title.get("de", "") if isinstance(title, dict) else str(title),
                 "abstract_de": abstract.get("de", "")
                 if isinstance(abstract, dict)
                 else str(abstract),
@@ -413,9 +409,7 @@ def save_document_batch(
             }
             for doc in documents
         ]
-        output_file.write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        output_file.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
 
     elif format_ == "csv":
         df = documents_to_dataframe(documents)

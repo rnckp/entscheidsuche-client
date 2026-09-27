@@ -1,4 +1,47 @@
-from entscheidsuche.models import CaseDocument, SearchHit
+import pytest
+
+from entscheidsuche.models import CaseDocument, JobsFile, SearchHit, SearchResult
+
+
+@pytest.mark.parametrize("payload", [[], {"Datum": []}, {"Signatur": {}}])
+def test_invalid_document_metadata_is_rejected(payload: object) -> None:
+    with pytest.raises(ValueError):
+        CaseDocument.from_json(payload)
+
+
+@pytest.mark.parametrize(
+    "payload", [[], {"hits": []}, {"hits": {"hits": [None]}}, {"hits": {"hits": [{"_source": []}]}}]
+)
+def test_invalid_search_response_is_rejected(payload: object) -> None:
+    with pytest.raises(ValueError):
+        SearchResult.from_json(payload)
+
+
+def test_search_result_accepts_null_scores_when_sorted() -> None:
+    result = SearchResult.from_json(
+        {"hits": {"total": {"value": 1}, "hits": [{"_id": "doc", "_score": None}]}}
+    )
+    assert result.hits[0].score is None
+
+
+def test_search_hit_language_falls_back_to_metadata() -> None:
+    hit = SearchHit(id="doc", score=0, source={"Sprache": "fr"})
+    assert hit.language == "fr"
+
+
+def test_jobs_returns_document_ids_once_for_matching_formats() -> None:
+    jobs = JobsFile.from_json(
+        {
+            "signaturen": {
+                "doc-a": {"json": "neu", "html": "neu", "pdf": {"status": "update"}},
+                "doc-b": {"json": "identisch"},
+            }
+        },
+        "CH_BGE",
+    )
+    assert jobs.get_documents_by_status("neu") == ["doc-a"]
+    assert jobs.get_documents_by_status("update") == ["doc-a"]
+    assert jobs.get_documents_by_status("identisch") == ["doc-b"]
 
 
 def test_case_document_parses_live_metadata_shape() -> None:
@@ -59,9 +102,6 @@ def test_search_hit_to_case_document_uses_search_index_fields() -> None:
     assert document.spider == "AG_BG"
     assert document.date == "1994-02-21"
     assert document.language == "de"
-    assert (
-        document.pdf_path
-        == "AG_Baugesetzgebung/AG_BG_001_Adressat-einer-Besei_1994-02-21.pdf"
-    )
+    assert document.pdf_path == "AG_Baugesetzgebung/AG_BG_001_Adressat-einer-Besei_1994-02-21.pdf"
     assert document.num == ["Adressat einer Beseitigungsverfügung"]
     assert document.kopfzeile == {"de": "Aargau Entscheidsammlung"}

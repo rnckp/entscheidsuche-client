@@ -2,12 +2,19 @@
 Data models for the entscheidsuche.ch API.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from datetime import datetime
 from pathlib import PurePosixPath
 from typing import Any
 
+from pydantic import ConfigDict, TypeAdapter
+from pydantic.dataclasses import dataclass
+
 from .config import DEFAULT_CONFIG
+
+_MODEL_CONFIG = ConfigDict(strict=True, hide_input_in_errors=True)
+_JSON_OBJECT = TypeAdapter(dict[str, Any], config=_MODEL_CONFIG)
+_JSON_OBJECTS = TypeAdapter(list[dict[str, Any]], config=_MODEL_CONFIG)
 
 
 def _text_by_language(value: Any) -> dict[str, str]:
@@ -58,7 +65,7 @@ def _document_id_from_path(path: str | None) -> str | None:
     return PurePosixPath(path).stem
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class ScraperInfo:
     """Information about a scraper/spider."""
 
@@ -81,7 +88,7 @@ class ScraperInfo:
         )
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class CaseDocument:
     """A legal case document from entscheidsuche.ch."""
 
@@ -101,10 +108,9 @@ class CaseDocument:
     time_utc: str | None = None
 
     @classmethod
-    def from_json(
-        cls, data: dict[str, Any], document_id: str | None = None
-    ) -> "CaseDocument":
+    def from_json(cls, data: dict[str, Any], document_id: str | None = None) -> "CaseDocument":
         """Create a CaseDocument from JSON data."""
+        data = _JSON_OBJECT.validate_python(data)
         kopfzeile = _text_by_language(data.get("Kopfzeile"))
         meta = _text_by_language(data.get("Meta"))
         abstract = _text_by_language(data.get("Abstract"))
@@ -139,9 +145,7 @@ class CaseDocument:
             or data.get("id")
         )
         source_url = (
-            data.get("URL")
-            or _source_url(data.get("HTML"))
-            or _source_url(data.get("PDF"))
+            data.get("URL") or _source_url(data.get("HTML")) or _source_url(data.get("PDF"))
         )
 
         return cls(
@@ -182,7 +186,7 @@ class CaseDocument:
         return f"{DEFAULT_CONFIG.docs_url}/{document_id}.json"
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class IndexFile:
     """Index file containing document updates for a scraper run."""
 
@@ -197,13 +201,14 @@ class IndexFile:
     @classmethod
     def from_json(cls, data: dict[str, Any], scraper: str) -> "IndexFile":
         """Create an IndexFile from JSON data."""
-        signaturen = data.get("signaturen", {})
+        data = _JSON_OBJECT.validate_python(data)
+        signaturen = _JSON_OBJECT.validate_python(data.get("signaturen", {}))
         total = 0
         new_docs = []
         updated_docs = []
         deleted_docs = []
 
-        for sig_name, sig_data in signaturen.items():
+        for sig_data in signaturen.values():
             if isinstance(sig_data, dict):
                 total += sig_data.get("gesamt", 0)
                 new_docs.extend(sig_data.get("new", []))
@@ -223,7 +228,7 @@ class IndexFile:
         )
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class JobsFile:
     """Jobs file containing all documents for a scraper."""
 
@@ -235,6 +240,7 @@ class JobsFile:
     @classmethod
     def from_json(cls, data: dict[str, Any], scraper: str) -> "JobsFile":
         """Create a JobsFile from JSON data."""
+        data = _JSON_OBJECT.validate_python(data)
         return cls(
             jobtyp=data.get("jobtyp", "unknown"),
             time=data.get("time", ""),
@@ -245,25 +251,21 @@ class JobsFile:
     def get_documents_by_status(self, status: str) -> list[str]:
         """Get document names by status (neu, identisch, update, nicht_mehr_da, etc.)."""
         result = []
-        for sig_name, sig_data in self.documents.items():
-            if isinstance(sig_data, dict):
-                for doc_name, doc_status in sig_data.items():
-                    if (
-                        isinstance(doc_status, dict)
-                        and doc_status.get("status") == status
-                    ):
-                        result.append(doc_name)
-                    elif doc_status == status:
-                        result.append(doc_name)
+        for doc_name, formats in self.documents.items():
+            if any(
+                (value.get("status") if isinstance(value, dict) else value) == status
+                for value in formats.values()
+            ):
+                result.append(doc_name)
         return result
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class SearchHit:
     """A single search result hit."""
 
     id: str
-    score: float
+    score: float | None
     source: dict[str, Any]
     index: str = ""
 
@@ -283,7 +285,7 @@ class SearchHit:
             # Index format: entscheidsuche.v2-ag_baugesetzgebung
             parts = self.index.split("-")
             if len(parts) > 1:
-                return parts[1].upper().replace("_", "_")
+                return parts[1].upper()
         return self.source.get("Spider", "")
 
     @property
@@ -296,7 +298,7 @@ class SearchHit:
         """Get document language."""
         attachment = self.source.get("attachment", {})
         if isinstance(attachment, dict):
-            return attachment.get("language", "de")
+            return attachment.get("language") or self.source.get("Sprache", "de")
         return self.source.get("Sprache", "de")
 
     @property
@@ -351,15 +353,13 @@ class SearchHit:
             document_id=self.signatur,
             num=self.reference,
             kopfzeile=self.title if isinstance(self.title, dict) else {},
-            meta=self.source.get("meta", {})
-            if isinstance(self.source.get("meta"), dict)
-            else {},
+            meta=self.source.get("meta", {}) if isinstance(self.source.get("meta"), dict) else {},
             abstract=self.abstract if isinstance(self.abstract, dict) else {},
             time_utc=self.source.get("scrapedate"),
         )
 
 
-@dataclass
+@dataclass(config=_MODEL_CONFIG)
 class SearchResult:
     """Search results from the Elasticsearch API."""
 
@@ -371,7 +371,8 @@ class SearchResult:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> "SearchResult":
         """Create a SearchResult from Elasticsearch response."""
-        hits_data = data.get("hits", {})
+        data = _JSON_OBJECT.validate_python(data)
+        hits_data = _JSON_OBJECT.validate_python(data.get("hits", {}))
         total = hits_data.get("total", {})
         if isinstance(total, dict):
             total_count = total.get("value", 0)
@@ -385,7 +386,7 @@ class SearchResult:
                 source=hit.get("_source", {}),
                 index=hit.get("_index", ""),
             )
-            for hit in hits_data.get("hits", [])
+            for hit in _JSON_OBJECTS.validate_python(hits_data.get("hits", []))
         ]
 
         return cls(
