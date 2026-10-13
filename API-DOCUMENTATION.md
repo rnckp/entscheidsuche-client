@@ -3,8 +3,9 @@
 This independent client is not affiliated with entscheidsuche.ch. These notes
 describe the requests and response mappings implemented in
 [`client.py`](entscheidsuche/client.py) and [`models.py`](entscheidsuche/models.py),
-with reduced examples based on current endpoint responses checked on 2026-10-13.
-The historical upstream PDF description is not used as a contract. Offline tests
+with reduced examples matching the implemented parsers and contract tests. The
+[provenance notes](tests/fixtures/README.md) record read-only checks on 2026-10-13;
+these notes do not establish the service's present state. Offline tests
 use sanitized fixtures; opt-in live tests check representative endpoints without
 claiming complete collection coverage or scraper scheduling guarantees.
 
@@ -29,20 +30,22 @@ The built-in endpoints are `https://entscheidsuche.ch` (`base_url`),
 | `list_documents(spider)` | `GET {docs_url}/{spider}/` |
 | `get_sitemap_index()` | `GET {base_url}/sitemapindex.xml` |
 
-Identifier arguments reject empty values, slashes, backslashes, and `.`/`..`;
-they are URL-quoted when inserted into paths. The metadata request validates
+Identifier arguments reject empty values, control characters, slashes, backslashes,
+and `.`/`..`; they are URL-quoted when inserted into paths. The metadata request validates
 `spider` but does not include it in the URL or check it against the response.
 
 ## Search
 
 `search()` sends nonempty text as `query_string` with `default_operator: AND`.
 Canton (uppercased) and `hierarchy` filters use `term` on `hierarchy`. The `spider`
-filter uses `term` on `_index`, with `entscheidsuche.v2-{spider.lower()}` as observed
-on the current service. Language uses
+filter uses `term` on `_index`, with `entscheidsuche.v2-{spider.lower()}`. Language uses
 `term` on `attachment.language`. Date bounds use `range` on `date` with `gte` and
 `lte`. These strings are passed through without validating date syntax or
 checking codes against the static lists. A sort clause is sent only when
 `sort_by` is provided. With no text or filters, the body omits `query`.
+With filters but no text, `must` contains `match_all`. Page size must be an integer
+from 0 to 10000, `from_` a nonnegative integer, and sort order `asc` or `desc`;
+these checks do not establish the service's pagination limits.
 
 For example, `search("Mietvertrag", canton="ZH", sort_by="date")` sends this body
 with the built-in defaults:
@@ -98,6 +101,8 @@ Document method arguments named `signatur` take the full document ID, such as
 `get_document_json()` preserves the requested ID as `CaseDocument.document_id`.
 When parsing without an explicit ID, the model tries the HTML filename stem,
 then the PDF filename stem, then the metadata `id` field.
+If no full ID is available, `json_url` falls back to `signatur`; a series prefix
+does not identify a particular document.
 
 Illustrative metadata accepted by the parser:
 
@@ -143,10 +148,12 @@ in the [README](README.md#document-access).
 passed through by the client and search-hit conversion. Standalone model parsing
 defaults to the public endpoint. HTML/PDF URLs validate and quote metadata paths
 using the same helper as the client getters; JSON IDs are validated and quoted.
+Unlike the getters, HTML/PDF URL properties return `None` when no metadata path
+is present; they do not construct a fallback path.
 
 ## Index and Jobs Parsing
 
-Current Index responses store changes in `actions`, not in `signaturen`:
+The supported Index response shape stores changes in `actions`:
 
 ```json
 {
@@ -193,10 +200,10 @@ a document can match multiple statuses. Jobs status strings remain open-ended.
 Missing `dateien` and malformed file entries are rejected.
 
 Both models retain `job`, `start_time` and `time`; Jobs also retains `lastjob`.
-The `scraper` field comes from the method argument. Index `/last` returned older
-checkpoints than Jobs `/last` in the sampled service responses. Do not treat a
-successful request as proof that its checkpoint is current or that no historical
-changes were missed.
+The `scraper` field comes from the method argument. Compare job IDs and timestamps;
+a successful `/last` request does not establish checkpoint freshness or prove
+that no historical changes were missed. The recorded observation behind this
+caveat is in [NOTES.md](NOTES.md).
 
 ## Blocklist, Directory, and Sitemaps
 
@@ -222,6 +229,6 @@ are retained where the schema is intentionally open-ended. Metadata text remains
 permissively normalized. Missing decision dates and languages are not inferred
 from document contents. Standalone models default to the public docs endpoint.
 
-See `tests/fixtures/README.md` for fixture provenance and `tests/test_api_live.py`
+See [fixture provenance](tests/fixtures/README.md) and [live tests](tests/test_api_live.py)
 for the opt-in live check. Remaining convenience and synchronization work is in
 [PLAN.md](PLAN.md).

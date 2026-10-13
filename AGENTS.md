@@ -7,6 +7,9 @@ This repository is a synchronous Python client library, with its package in
 web application, database, and agentic-AI sections below are conditional guidance,
 not descriptions of implemented components. See [README.md](README.md) for the
 current structure and [PLAN.md](PLAN.md) for tooling gaps.
+Application logging, health checks, database persistence, and agent telemetry
+guidance applies only if those application components are introduced. This
+library propagates errors to callers and does not configure application logging.
 
 ## Priority
 

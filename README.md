@@ -97,8 +97,9 @@ The client loads `config.yaml` from the current working directory, falling back
 to built-in defaults if that implicit file is absent. Pass `config_path` to select
 another file. YAML settings may be under `entscheidsuche:` (as in the checked-in
 [config](config.yaml)) or directly at the root. Missing settings use built-in
-defaults; unknown settings are rejected. Constructor `timeout` and
-`rate_limit_delay` arguments override the loaded values.
+defaults; unknown settings in the selected client mapping are rejected. When
+`entscheidsuche:` is present, other root sections are ignored. Constructor
+`timeout` and `rate_limit_delay` arguments override the loaded values.
 
 The synchronous HTTPX client defaults to a 30-second timeout and a 0.5-second
 minimum interval between sequential request starts per instance. There is no
@@ -112,9 +113,9 @@ fragments. An explicitly supplied `config_path` must exist. Invalid metadata
 paths used for content retrieval and malformed blocklists raise validation errors.
 
 `cache_dir` is deprecated and has no effect. Passing a non-`None` value emits
-`DeprecationWarning`; remove it from constructor calls. It will be removed in a
-future release. Returned documents and search hits carry the client's `docs_url`,
-including during conversion and URL generation. Content paths are validated and
+`DeprecationWarning`; remove it from constructor calls. Returned documents and
+search hits carry the client's `docs_url`, including during conversion and URL
+generation. Content paths are validated and
 quoted consistently in model URLs and client getters.
 
 ### Index & Jobs
@@ -130,13 +131,10 @@ sitemaps = client.get_sitemap_index()  # sitemap URLs; does not fetch their cont
 ```
 
 The blocklist is not automatically applied to searches or downloads. Index
-changes come from `actions`; change lists contain full document IDs, while
-`index.actions` retains file paths. Jobs reads `dateien`: `jobs.files` retains
-paths and typed statuses, and `jobs.documents` groups files by document ID and
-format. A document matches a status when any of its files matches. Both responses
-retain `job` and `start_time`; Jobs also retains `lastjob`. Compare checkpoints
-and timestamps: sampled Index `/last` responses were older than Jobs `/last`.
-See the [API notes](API-DOCUMENTATION.md) for current response contracts.
+change lists contain full document IDs; Jobs groups per-file statuses by document
+ID and format. Compare job IDs and timestamps before using these responses for
+synchronization: `/last` does not guarantee a current or complete checkpoint.
+See the [API notes](API-DOCUMENTATION.md#index-and-jobs-parsing) for field mappings.
 
 ### Utilities
 
@@ -164,8 +162,8 @@ parsed = parse_case_number("4A_123/2023")
 These helpers operate on supplied data without fetching more results.
 `parse_case_number()` recognizes the federal forms `4A_123/2023` and `A-1234/2023`;
 otherwise it only searches for a four-digit year. Date filtering compares strings
-and assumes ISO dates. Canton grouping uses the spider prefix (or `XX` when absent),
-so statistics may include federal and other source codes.
+and assumes ISO dates. Canton grouping uses the spider prefix (or `XX` when there
+is no underscore), so statistics may include federal and other source codes.
 
 DataFrame conversion and CSV export require pandas, included in the development
 environment but not the package's runtime dependencies. Batch export writes a
@@ -183,9 +181,9 @@ EntscheidsucheClient.get_canton_name("ZH")  # "Zürich"
 ```
 
 These methods return static package data, not a live inventory or coverage check.
-The canton mapping includes all 26 cantons and `CH`; the scraper list includes
-the additional sources observed on 2026-10-13, but is not a guarantee of future
-service coverage. Prefer `get_facets()` for live mappings.
+The canton mapping includes all 26 cantons and `CH`; the scraper list is maintained
+in `models.py` and does not guarantee service coverage. Prefer `get_facets()` for
+live mappings.
 `ScraperInfo.from_status_line()` is a placeholder and does not parse status data.
 
 ## Development and Examples
@@ -193,11 +191,13 @@ service coverage. Prefer `get_facets()` for live mappings.
 - `entscheidsuche/client.py`: synchronous HTTP requests and file downloads.
 - `entscheidsuche/models.py`: Pydantic dataclasses, response parsing, static lookups.
 - `entscheidsuche/config.py`: validated YAML settings and built-in defaults.
+- `entscheidsuche/paths.py`: shared identifier and document-path validation.
 - `entscheidsuche/utils.py`: local queries, transformations, statistics, and exports.
 - `tests/`: local response-contract tests and opt-in live API checks.
 - `main.py`: search demo, run with `uv run main.py` (makes network requests).
 - [Example notebook](examples/entscheidsuche_demo.ipynb): launch with
   `uv run jupyter lab` after `uv sync`, using the repository environment as kernel.
+  The kernel's working directory controls implicit configuration and download paths.
 - [NOTES.md](NOTES.md): implementation rationale;
   [PLAN.md](PLAN.md): unresolved findings.
 
