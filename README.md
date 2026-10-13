@@ -47,7 +47,8 @@ results = client.search(
     size=20,  # client accepts 0–10000
     from_=0,  # pagination offset
     canton="ZH",  # filter by canton
-    spider="ZH_Obergericht",  # filter by spider
+    spider="ZH_Obergericht",  # filter by scraper index
+    hierarchy="ZH_OG",  # optional court ID from get_facets()
     language="de",  # passed through to the service
     date_from="2023-01-01",
     date_to="2023-12-31",
@@ -59,10 +60,17 @@ results = client.search(
 raw = client.search_raw({"query": {"match_all": {}}, "size": 5})
 ```
 
-Each call returns one page; pagination is manual. `results.total` preserves the
-reported count but discards the service's exact/lower-bound indicator. Use
-`search_raw()` when that distinction matters. Server query limits are not
-established by the client's size validation.
+Each call returns one page; pagination is manual. `results.total_relation` is
+`eq` for an exact count, `gte` for a lower bound, or `None` if not reported.
+`results.timed_out`, `results.shards`, and each hit's `sort` values are retained.
+Timeouts or shard failures raise `IncompleteSearchError`; its `result` attribute
+contains partial results. `search_raw()` preserves responses without translating
+these errors. Server query limits are not established by size validation.
+
+`spider` selects a scraper index; `hierarchy` selects a canton, court, or chamber.
+These IDs differ: `CH_BPatG` is a scraper, while `CH_PATG` is a court.
+`hit.spider` identifies the scraper and `hit.court_id` the court. Use
+`client.get_facets()` for current labels and hierarchy-to-scraper mappings.
 
 ### Document Access
 
@@ -103,23 +111,32 @@ nonnegative, and endpoints must be HTTP(S) URLs without credentials, queries or
 fragments. An explicitly supplied `config_path` must exist. Invalid metadata
 paths used for content retrieval and malformed blocklists raise validation errors.
 
-`cache_dir` is reserved and does not enable caching. `CaseDocument` URL properties
-and content-path extraction in `SearchHit.to_case_document()` use the built-in
-docs endpoint, even when the client uses custom endpoints.
+`cache_dir` is deprecated and has no effect. Passing a non-`None` value emits
+`DeprecationWarning`; remove it from constructor calls. It will be removed in a
+future release. Returned documents and search hits carry the client's `docs_url`,
+including during conversion and URL generation. Content paths are validated and
+quoted consistently in model URLs and client getters.
 
 ### Index & Jobs
 
 ```python
 index = client.get_index("CH_BGE")  # IndexFile - document changes
-jobs = client.get_jobs("CH_BGE")  # JobsFile - document statuses
+jobs = client.get_jobs("CH_BGE")  # JobsFile - per-file statuses
+new_ids = jobs.get_documents_by_status("neu")  # one ID per matching document
+facets = client.get_facets()  # live canton/court/chamber labels and scraper mappings
 blocked = client.get_blocklist()  # list[str] - blocked documents
 files = client.list_documents("CH_BGE")  # directory hrefs ending in json/html/pdf
 sitemaps = client.get_sitemap_index()  # sitemap URLs; does not fetch their contents
 ```
 
-The blocklist is not automatically applied to searches or downloads. Index and
-jobs results reflect the parser's expected shapes; see the [API notes](API-DOCUMENTATION.md)
-for validation limits.
+The blocklist is not automatically applied to searches or downloads. Index
+changes come from `actions`; change lists contain full document IDs, while
+`index.actions` retains file paths. Jobs reads `dateien`: `jobs.files` retains
+paths and typed statuses, and `jobs.documents` groups files by document ID and
+format. A document matches a status when any of its files matches. Both responses
+retain `job` and `start_time`; Jobs also retains `lastjob`. Compare checkpoints
+and timestamps: sampled Index `/last` responses were older than Jobs `/last`.
+See the [API notes](API-DOCUMENTATION.md) for current response contracts.
 
 ### Utilities
 
@@ -166,9 +183,10 @@ EntscheidsucheClient.get_canton_name("ZH")  # "Zürich"
 ```
 
 These methods return static package data, not a live inventory or coverage check.
-The canton mapping includes all 26 cantons and `CH`; the scraper list is not a
-guarantee of complete or current service coverage. `ScraperInfo.from_status_line()`
-is a placeholder and does not parse status data.
+The canton mapping includes all 26 cantons and `CH`; the scraper list includes
+the additional sources observed on 2026-10-13, but is not a guarantee of future
+service coverage. Prefer `get_facets()` for live mappings.
+`ScraperInfo.from_status_line()` is a placeholder and does not parse status data.
 
 ## Development and Examples
 
@@ -176,7 +194,7 @@ is a placeholder and does not parse status data.
 - `entscheidsuche/models.py`: Pydantic dataclasses, response parsing, static lookups.
 - `entscheidsuche/config.py`: validated YAML settings and built-in defaults.
 - `entscheidsuche/utils.py`: local queries, transformations, statistics, and exports.
-- `tests/`: local tests with mocked HTTP responses; no live API contract suite.
+- `tests/`: local response-contract tests and opt-in live API checks.
 - `main.py`: search demo, run with `uv run main.py` (makes network requests).
 - [Example notebook](examples/entscheidsuche_demo.ipynb): launch with
   `uv run jupyter lab` after `uv sync`, using the repository environment as kernel.
@@ -190,6 +208,9 @@ uv run ruff format --check .
 uv run ruff check .
 uv run pytest
 ```
+
+Run `uv run pytest --live-api tests/test_api_live.py` to explicitly opt into a
+small read-only live contract check. Default tests make no network requests.
 
 Use `uv run ruff format .` to apply formatting. Dependabot is configured in
 `.github/dependabot.yml`; there is no checked-in CI workflow or pre-commit setup.

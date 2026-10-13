@@ -25,7 +25,7 @@ def test_build_search_query_uses_live_search_fields() -> None:
         text="Mietvertrag",
         case_number="4A_123/2023",
         canton="zh",
-        court="ZH_Obergericht",
+        court="ZH_OG",
         year=2023,
         language="de",
     )
@@ -33,7 +33,7 @@ def test_build_search_query_uses_live_search_fields() -> None:
     bool_query = query["query"]["bool"]
     assert {"match": {"reference": "4A_123/2023"}} in bool_query["must"]
     assert {"term": {"hierarchy": "ZH"}} in bool_query["filter"]
-    assert {"term": {"hierarchy": "ZH_Obergericht"}} in bool_query["filter"]
+    assert {"term": {"hierarchy": "ZH_OG"}} in bool_query["filter"]
     assert {"term": {"attachment.language": "de"}} in bool_query["filter"]
     assert {"range": {"date": {"gte": "2023-01-01", "lte": "2023-12-31"}}} in bool_query["filter"]
 

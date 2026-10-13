@@ -1,0 +1,27 @@
+{
+  "took": 11,
+  "timed_out": false,
+  "_shards": {"total": 53, "successful": 53, "skipped": 0, "failed": 0},
+  "hits": {
+    "total": {"value": 10000, "relation": "gte"},
+    "max_score": null,
+    "hits": [{
+      "_index": "entscheidsuche.v2-ag_baugesetzgebung",
+      "_id": "example-id",
+      "_score": null,
+      "sort": [1427673600000, "example-id"],
+      "_source": {
+        "id": "example-id",
+        "date": "2015-03-30",
+        "hierarchy": ["AG", "AG_BG", "AG_BG_001"],
+        "title": {"de": "Example title", "fr": "Exemple"},
+        "abstract": {"de": "Example summary"},
+        "reference": ["example reference"],
+        "attachment": {
+          "language": "de",
+          "content_url": "https://entscheidsuche.ch/docs/AG_Baugesetzgebung/example-id.pdf"
+        }
+      }
+    }]
+  }
+}

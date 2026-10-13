@@ -1,0 +1,17 @@
+{
+  "spider": "CH_BPatG",
+  "job": "446973/64/2326",
+  "jobtyp": "komplett",
+  "start_time": "2026-10-13_03:15:23",
+  "time": "2026-10-13_03:17:01",
+  "dateien": {
+    "CH_BPatG/doc-a.json": {"status": "neu", "checksum": "example", "last_change": "446973/64/2326"},
+    "CH_BPatG/doc-a.pdf": {"status": "neu", "scrapedate": "2026-10-13"},
+    "CH_BPatG/doc-b.json": {"status": "identisch", "last_change": "446973/64/2135"},
+    "CH_BPatG/doc-b.pdf": {"status": "update"},
+    "CH_BPatG/doc-c.json": {"status": "nicht_mehr_da"}
+  },
+  "signaturen": {"CH_PATG_001": {"gesamt": 3, "aktuell_neu": 1}},
+  "gesamt": {"gesamt": 3},
+  "lastjob": {"id": "446973/64/2325", "documents": 3, "in_elasticsearch": 3}
+}

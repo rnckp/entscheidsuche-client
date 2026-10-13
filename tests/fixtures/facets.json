@@ -1,0 +1,15 @@
+{
+  "CH": {
+    "de": "Eidgenossenschaft",
+    "fr": "Conféderation",
+    "it": "Confederazione",
+    "gerichte": {
+      "CH_PATG": {
+        "de": "Bundespatentgericht",
+        "kammern": {
+          "CH_PATG_001": {"spider": "CH_BPatG", "de": "Bundespatentgericht"}
+        }
+      }
+    }
+  }
+}

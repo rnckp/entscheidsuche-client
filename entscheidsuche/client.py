@@ -3,10 +3,10 @@ Main client for the entscheidsuche.ch API.
 """
 
 import time
+import warnings
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any, Self
-from urllib.parse import quote, unquote
 from xml.etree import ElementTree
 
 import httpx
@@ -17,9 +17,19 @@ from .models import (
     CANTONS,
     SCRAPERS,
     CaseDocument,
+    FacetNode,
     IndexFile,
     JobsFile,
     SearchResult,
+)
+from .paths import (
+    quote_segment as _quote_segment,
+)
+from .paths import (
+    validate_document_path as _validate_document_path,
+)
+from .paths import (
+    validate_identifier as _validate_identifier,
 )
 
 ALLOWED_DOCUMENT_FORMATS = {"json", "html", "pdf"}
@@ -41,28 +51,6 @@ class _DirectoryListingParser(HTMLParser):
         href = attributes.get("href")
         if href and href.endswith((".json", ".html", ".pdf")):
             self.links.append(href)
-
-
-def _validate_identifier(value: str, name: str) -> str:
-    if not value or "/" in value or "\\" in value or value in {".", ".."}:
-        raise ValueError(f"Invalid {name}: {value!r}")
-    return value
-
-
-def _quote_segment(value: str) -> str:
-    return quote(value, safe="")
-
-
-def _validate_document_path(value: str) -> str:
-    """Constrain remote metadata to a relative path below the docs endpoint."""
-    decoded = unquote(value)
-    if (
-        any(character in decoded for character in "\\?#:%")
-        or any(ord(character) < 32 or ord(character) == 127 for character in decoded)
-        or any(part in {"", ".", ".."} for part in decoded.split("/"))
-    ):
-        raise ValueError("Invalid document path in metadata")
-    return "/".join(_quote_segment(part) for part in decoded.split("/"))
 
 
 class EntscheidsucheClient:
@@ -96,7 +84,7 @@ class EntscheidsucheClient:
         Args:
             timeout: Request timeout in seconds.
             rate_limit_delay: Minimum delay between requests in seconds.
-            cache_dir: Reserved for future caching; currently has no effect.
+            cache_dir: Deprecated, ignored option; passing it emits DeprecationWarning.
             config_path: Optional path to a config.yaml file.
             transport: Optional HTTPX transport, mainly useful for tests.
         """
@@ -111,7 +99,13 @@ class EntscheidsucheClient:
         self.search_url = self.config.search_url
         self.timeout = self.config.timeout
         self.rate_limit_delay = self.config.rate_limit_delay
-        self.cache_dir = cache_dir
+        if cache_dir is not None:
+            warnings.warn(
+                "cache_dir is deprecated and has no effect; it will be removed in a future release",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        self.cache_dir = cache_dir  # Retained during deprecation for compatibility.
         self._last_request_time = 0.0
         self._client = httpx.Client(timeout=self.timeout, transport=transport)
 
@@ -162,6 +156,7 @@ class EntscheidsucheClient:
         date_to: str | None = None,
         sort_by: str | None = None,
         sort_order: str | None = None,
+        hierarchy: str | None = None,
     ) -> SearchResult:
         """
         Search for court decisions using Elasticsearch.
@@ -171,7 +166,8 @@ class EntscheidsucheClient:
             size: Requested page size (configured default, built-in 10; range 0–10000).
             from_: Offset for pagination.
             canton: Filter by canton code (e.g., "ZH", "BE").
-            spider: Filter by spider/scraper name.
+            spider: Filter by scraper name through its current v2 search index.
+            hierarchy: Filter by canton, court or chamber ID from get_facets().
             language: Filter by language ("de", "fr", "it").
             date_from: Filter by minimum date (YYYY-MM-DD).
             date_to: Filter by maximum date (YYYY-MM-DD).
@@ -179,7 +175,11 @@ class EntscheidsucheClient:
             sort_order: Sort order (configured default, built-in "desc").
 
         Returns:
-            SearchResult containing hits and metadata.
+            SearchResult containing hits, count relation, cursors and shard metadata.
+
+        Raises:
+            IncompleteSearchError: A timeout or shard failure occurred; partial
+                results are retained in the exception result attribute.
         """
         result_size = size if size is not None else self.config.default_search_size
         order = sort_order if sort_order is not None else self.config.default_sort_order
@@ -206,7 +206,11 @@ class EntscheidsucheClient:
             filter_clauses.append({"term": {"hierarchy": canton.upper()}})
 
         if spider:
-            filter_clauses.append({"term": {"hierarchy": spider}})
+            _validate_identifier(spider, "spider")
+            filter_clauses.append({"term": {"_index": f"entscheidsuche.v2-{spider.lower()}"}})
+
+        if hierarchy:
+            filter_clauses.append({"term": {"hierarchy": hierarchy}})
 
         if language:
             filter_clauses.append({"term": {"attachment.language": language}})
@@ -236,7 +240,7 @@ class EntscheidsucheClient:
             query_body["sort"] = [{sort_by: {"order": order}}]
 
         response = self._post(self.search_url, query_body)
-        return SearchResult.from_json(response.json())
+        return SearchResult.from_json(response.json(), docs_url=self.docs_url)
 
     def search_raw(self, query_body: dict[str, Any]) -> dict[str, Any]:
         """
@@ -270,7 +274,7 @@ class EntscheidsucheClient:
         _validate_identifier(signatur, "signatur")
         url = f"{self.docs_url}/{_quote_segment(signatur)}.json"
         response = self._get(url)
-        return CaseDocument.from_json(response.json(), document_id=signatur)
+        return CaseDocument.from_json(response.json(), document_id=signatur, docs_url=self.docs_url)
 
     def _document_path(self, spider: str, signatur: str, format_: str) -> str:
         document = self.get_document_json(spider, signatur)
@@ -404,7 +408,7 @@ class EntscheidsucheClient:
             spider: Spider/scraper name.
 
         Returns:
-            JobsFile mapping the response's signaturen field to documents.
+            JobsFile retaining file statuses and grouping them by document ID.
         """
         _validate_identifier(spider, "spider")
         url = f"{self.docs_url}/Jobs/{_quote_segment(spider)}/last"
@@ -412,8 +416,13 @@ class EntscheidsucheClient:
         return JobsFile.from_json(response.json(), spider)
 
     # -------------------------------------------------------------------------
-    # Blocklist
+    # Live Facets and Blocklist
     # -------------------------------------------------------------------------
+
+    def get_facets(self) -> dict[str, FacetNode]:
+        """Get live canton/court/chamber labels and scraper mappings."""
+        response = self._get(f"{self.docs_url}/Facetten.json")
+        return TypeAdapter(dict[str, FacetNode]).validate_python(response.json())
 
     def get_blocklist(self) -> list[str]:
         """

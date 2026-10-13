@@ -32,9 +32,11 @@ def test_search_hit_language_falls_back_to_metadata() -> None:
 def test_jobs_returns_document_ids_once_for_matching_formats() -> None:
     jobs = JobsFile.from_json(
         {
-            "signaturen": {
-                "doc-a": {"json": "neu", "html": "neu", "pdf": {"status": "update"}},
-                "doc-b": {"json": "identisch"},
+            "dateien": {
+                "CH_BGE/doc-a.json": {"status": "neu"},
+                "CH_BGE/doc-a.html": {"status": "neu"},
+                "CH_BGE/doc-a.pdf": {"status": "update"},
+                "CH_BGE/doc-b.json": {"status": "identisch"},
             }
         },
         "CH_BGE",
@@ -99,7 +101,8 @@ def test_search_hit_to_case_document_uses_search_index_fields() -> None:
     document = hit.to_case_document()
 
     assert document.signatur == "AG_BG_001_Adressat-einer-Besei_1994-02-21"
-    assert document.spider == "AG_BG"
+    assert document.spider == "AG_Baugesetzgebung"
+    assert hit.court_id == "AG_BG"
     assert document.date == "1994-02-21"
     assert document.language == "de"
     assert document.pdf_path == "AG_Baugesetzgebung/AG_BG_001_Adressat-einer-Besei_1994-02-21.pdf"

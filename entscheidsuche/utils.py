@@ -321,7 +321,7 @@ def build_search_query(
         text: Full-text search query.
         case_number: Specific case number to search for.
         canton: Canton code filter.
-        court: Court name filter.
+        court: Court hierarchy ID from get_facets(), such as "ZH_OG".
         year: Year filter.
         language: Language filter.
 

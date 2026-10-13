@@ -3,9 +3,10 @@
 This independent client is not affiliated with entscheidsuche.ch. These notes
 describe the requests and response mappings implemented in
 [`client.py`](entscheidsuche/client.py) and [`models.py`](entscheidsuche/models.py),
-with illustrative payloads. They are not an upstream API specification. Local
-tests establish parser behavior, not current service compatibility, collection
-completeness, scraper schedules, or status semantics. Those remain unverified.
+with reduced examples based on current endpoint responses checked on 2026-10-13.
+The historical upstream PDF description is not used as a contract. Offline tests
+use sanitized fixtures; opt-in live tests check representative endpoints without
+claiming complete collection coverage or scraper scheduling guarantees.
 
 For installation, Python usage, configuration, and fair-use guidance, see the
 [README](README.md).
@@ -23,6 +24,7 @@ The built-in endpoints are `https://entscheidsuche.ch` (`base_url`),
 | `get_document_html()`, `get_document_pdf()` | Fetch metadata, then `GET {docs_url}/{path}` |
 | `get_index(spider)` | `GET {docs_url}/Index/{spider}/last` |
 | `get_jobs(spider)` | `GET {docs_url}/Jobs/{spider}/last` |
+| `get_facets()` | `GET {docs_url}/Facetten.json` |
 | `get_blocklist()` | `GET {docs_url}/Blockliste.json` |
 | `list_documents(spider)` | `GET {docs_url}/{spider}/` |
 | `get_sitemap_index()` | `GET {base_url}/sitemapindex.xml` |
@@ -34,7 +36,9 @@ they are URL-quoted when inserted into paths. The metadata request validates
 ## Search
 
 `search()` sends nonempty text as `query_string` with `default_operator: AND`.
-Canton (uppercased) and spider filters use `term` on `hierarchy`; language uses
+Canton (uppercased) and `hierarchy` filters use `term` on `hierarchy`. The `spider`
+filter uses `term` on `_index`, with `entscheidsuche.v2-{spider.lower()}` as observed
+on the current service. Language uses
 `term` on `attachment.language`. Date bounds use `range` on `date` with `gte` and
 `lte`. These strings are passed through without validating date syntax or
 checking codes against the static lists. A sort clause is sent only when
@@ -57,28 +61,35 @@ with the built-in defaults:
 }
 ```
 
-`SearchResult.from_json()` reads `took`, `hits.max_score`, `hits.hits`, and
-`hits.total` (an integer or an object with `value`). It discards `total.relation`;
-the resulting count is not necessarily an exact total. Scores can be `None`.
-Raw queries and responses pass through `search_raw()` without model conversion.
+`SearchResult.from_json()` retains `took`, `hits.max_score`, `hits.hits`,
+`hits.total.value`, `hits.total.relation`, `timed_out`, and `_shards`. Legacy integer
+counts have relation `eq`; absent relation values remain `None`. `gte` means the
+count is a lower bound. Scores can be `None`. Each hit retains its `sort` array,
+which can be passed to a raw query as `search_after` with compatible sorting.
+Timeouts and shard failures raise `IncompleteSearchError`, with partial data in
+`error.result`. `search_raw()` leaves error interpretation to the caller.
 
-Each `SearchHit` retains `_id`, `_score`, `_index`, and the open-ended `_source`:
+Each `SearchHit` retains `_id`, `_score`, `_index`, and `_source`. Source fields
+used by public properties are validated; additional fields are retained.
+Optional null hierarchy/text/attachment collections become empty collections.
 
 | Property | Mapping |
 | --- | --- |
 | `signatur` | `_source.id`, then `_id`, then `_source.Signatur` |
-| `spider` | `hierarchy[1]`; otherwise an uppercased index suffix, then `Spider` |
+| `court_id` | `hierarchy[1]`, or `None` |
+| `spider` | Explicit `Spider`, then configured docs content directory, then known index suffix with canonical case; otherwise empty string |
 | `date` | `date`, then `Datum`, otherwise empty string |
 | `language` | `attachment.language`, then `Sprache`, otherwise `de` |
-| `title`, `abstract` | Corresponding source values; default empty dictionaries |
-| `content_url` | `attachment.content_url`, if attachment is a dictionary |
-| `reference` | `reference` normalized from a string or list to a list of strings |
+| `title`, `abstract` | Validated language-to-text dictionaries |
+| `content_url` | `attachment.content_url` |
+| `reference` | String or list normalized to a list of strings |
+| `sort` | Sort values returned by Elasticsearch, or `None` |
 
-The client treats `hierarchy` as a sequence whose second entry identifies a
-source; that value need not match the content directory. For example, the test
-fixture uses `AG_BG` in the hierarchy and `AG_Baugesetzgebung` in the content path.
-`to_case_document()` converts fields already in a hit without fetching metadata.
-It recognizes HTML/PDF paths only below the built-in docs URL.
+For example, `CH_PATG` is a court ID; `CH_BPatG` is its scraper directory/index.
+`get_facets()` reads the current `Facetten.json` mapping. Its `FacetNode` values
+retain language labels and nested `gerichte` and `kammern` mappings; chamber
+nodes can carry `spider`. `to_case_document()` converts a hit without fetching
+metadata. It recognizes validated HTML/PDF paths below that hit's `docs_url`.
 
 ## Document Metadata and Content
 
@@ -128,50 +139,64 @@ Missing metadata or content can raise HTTP errors. Format availability is not
 guaranteed. Download behavior, including skipped 404s and overwrites, is described
 in the [README](README.md#document-access).
 
-`CaseDocument.html_url`, `pdf_url`, and `json_url` use the built-in docs endpoint,
-not the client's custom configuration. They construct strings without the path
-validation used by the client getters.
+`CaseDocument.html_url`, `pdf_url`, and `json_url` use the document's `docs_url`,
+passed through by the client and search-hit conversion. Standalone model parsing
+defaults to the public endpoint. HTML/PDF URLs validate and quote metadata paths
+using the same helper as the client getters; JSON IDs are validated and quoted.
 
 ## Index and Jobs Parsing
 
-`IndexFile.from_json()` expects `signaturen` entries such as:
+Current Index responses store changes in `actions`, not in `signaturen`:
 
 ```json
 {
+  "spider": "CH_BGer",
+  "job": "446973/45/2707",
+  "jobtyp": "update",
+  "start_time": "2026-06-19_07:52:39",
+  "time": "2026-06-19_11:30:20",
+  "actions": {"CH_BGer/example-id.json": "new"},
+  "signaturen": {"CH_BGer_006": {"gesamt": 10, "aktuell_neu": 1}},
+  "gesamt": {"gesamt": 10, "aktuell_neu": 1}
+}
+```
+
+`IndexFile` retains `actions` and maps `new`/`update`/`delete` JSON paths to full
+IDs in `new_documents`, `updated_documents`, and `deleted_documents`.
+`total_count` uses `gesamt.gesamt`, falling back to summed signature counts when
+that summary is absent. Signature status counters are not document lists.
+Malformed actions, unsafe paths, unsupported actions, and invalid counts raise
+validation errors instead of silently producing empty changes.
+
+Jobs responses store per-file statuses in `dateien`:
+
+```json
+{
+  "spider": "CH_BPatG",
+  "job": "446973/64/2326",
   "jobtyp": "komplett",
-  "time": "2023-06-01_05:30:15",
-  "signaturen": {
-    "CH_BGE_001": {
-      "gesamt": 2,
-      "new": ["document-a"],
-      "update": ["document-b"],
-      "delete": []
-    }
-  }
+  "time": "2026-10-13_03:17:01",
+  "dateien": {
+    "CH_BPatG/example-id.json": {"status": "identisch", "last_change": "446973/64/2135"},
+    "CH_BPatG/example-id.pdf": {"status": "update", "scrapedate": "2026-10-13"}
+  },
+  "signaturen": {"CH_PATG_001": {"gesamt": 1}},
+  "lastjob": {"id": "446973/64/2325", "documents": 1, "in_elasticsearch": 1}
 }
 ```
 
-It sums per-entry `gesamt` values (or integer entries) into `total_count` and
-concatenates the `new`, `update`, and `delete` lists. It ignores a top-level
-`gesamt`. `scraper` comes from the method argument, not the response.
+`jobs.files` maps scraper-relative file paths to `FileStatus` models, retaining
+status, checksum, last change, scrape date and additional upstream fields.
+`jobs.documents` maps full document IDs to format-to-status mappings. Each
+`get_documents_by_status()` result includes an ID once if any format matches;
+a document can match multiple statuses. Jobs status strings remain open-ended.
+Missing `dateien` and malformed file entries are rejected.
 
-`JobsFile.from_json()` maps `signaturen` directly to `documents`. The status
-helper accepts per-format strings or objects containing `status`, as tested by:
-
-```json
-{
-  "signaturen": {
-    "document-a": {"json": "neu", "pdf": {"status": "update"}},
-    "document-b": {"json": "identisch"}
-  }
-}
-```
-
-`get_documents_by_status("neu")` returns each matching document key once if any
-format matches. Status and `jobtyp` values are not enums and their upstream
-semantics are not validated. Both models default missing `jobtyp` to `unknown`
-and `time` to an empty string. Live Jobs compatibility remains unverified; the
-local fixture is evidence of parser behavior only.
+Both models retain `job`, `start_time` and `time`; Jobs also retains `lastjob`.
+The `scraper` field comes from the method argument. Index `/last` returned older
+checkpoints than Jobs `/last` in the sampled service responses. Do not treat a
+successful request as proof that its checkpoint is current or that no historical
+changes were missed.
 
 ## Blocklist, Directory, and Sitemaps
 
@@ -190,7 +215,13 @@ no guarantee about sitemap refresh timing or completeness.
 
 ## Validation Limits
 
-Models are Pydantic dataclasses with typed fields, but nested search `_source`
-and index/job dictionaries remain partly open-ended. Some metadata fields are
-normalized permissively. Malformed nested values can still fail later or be
-misinterpreted; see [PLAN.md](PLAN.md) for unresolved contract work.
+Public models preserve existing positional dataclass constructors. Nested source
+fields used by public hit properties, Index actions/counts, Jobs file statuses,
+and facets are validated with Pydantic. Additional source and provenance fields
+are retained where the schema is intentionally open-ended. Metadata text remains
+permissively normalized. Missing decision dates and languages are not inferred
+from document contents. Standalone models default to the public docs endpoint.
+
+See `tests/fixtures/README.md` for fixture provenance and `tests/test_api_live.py`
+for the opt-in live check. Remaining convenience and synchronization work is in
+[PLAN.md](PLAN.md).

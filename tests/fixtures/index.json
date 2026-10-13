@@ -1,0 +1,14 @@
+{
+  "spider": "CH_BGer",
+  "job": "446973/45/2707",
+  "jobtyp": "update",
+  "start_time": "2026-06-19_07:52:39",
+  "time": "2026-06-19_11:30:20",
+  "actions": {
+    "CH_BGer/doc-new.json": "new",
+    "CH_BGer/doc-updated.json": "update",
+    "CH_BGer/doc-deleted.json": "delete"
+  },
+  "signaturen": {"CH_BGer_006": {"gesamt": 10, "aktuell_neu": 1}},
+  "gesamt": {"gesamt": 10, "aktuell_neu": 1}
+}
