@@ -1,5 +1,7 @@
 # Notes
 
+- Packaging uses `uv_build` with `module-name = "entscheidsuche"` and `module-root = ""` to preserve the existing flat package layout. Keep `uv build --force-pep517` so builds use the declared backend range when the uv CLI bundles a newer backend.
+
 - Required CI covers Python 3.12–3.14. A local Python 3.15 smoke test passed on macOS arm64 on 2026-10-14, but the locked `pydantic-core` needed a source build. Keep 3.15 outside required CI until eligible wheels make setup fast and reproducible; a local pass does not establish Linux compatibility.
 
 - Keep full document IDs separate from metadata series signatures. The client preserves the requested ID as `CaseDocument.document_id`; replacing it with metadata `Signatur` can break retrieval. Canonical field mappings and accepted payload shapes are in [API-DOCUMENTATION.md](API-DOCUMENTATION.md).
