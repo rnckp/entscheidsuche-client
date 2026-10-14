@@ -6,7 +6,8 @@ This repository is a synchronous Python client library, with its package in
 `entscheidsuche/` and Python support defined in `pyproject.toml`. The platform,
 web application, database, and agentic-AI sections below are conditional guidance,
 not descriptions of implemented components. See [README.md](README.md) for the
-current structure and [PLAN.md](PLAN.md) for tooling gaps.
+public overview, [CONTRIBUTING.md](CONTRIBUTING.md) for development, and
+[PLAN.md](PLAN.md) for open tasks.
 Application logging, health checks, database persistence, and agent telemetry
 guidance applies only if those application components are introduced. This
 library propagates errors to callers and does not configure application logging.

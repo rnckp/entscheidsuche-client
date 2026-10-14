@@ -1,4 +1,7 @@
-# Notes
+# Implementation notes
+
+Durable decisions, constraints, and historical observations. Public usage is in
+the [client guide](docs/client-guide.md); open work is in [PLAN.md](PLAN.md).
 
 - Packaging uses `uv_build` with `module-name = "entscheidsuche"` and `module-root = ""` to preserve the existing flat package layout. Keep `uv build --force-pep517` so builds use the declared backend range when the uv CLI bundles a newer backend.
 

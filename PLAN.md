@@ -1,4 +1,7 @@
-# Remaining review findings
+# Open tasks
+
+Unresolved implementation, compatibility, and infrastructure work. See
+[NOTES.md](NOTES.md) for established constraints and historical evidence.
 
 - **Incomplete feature:** `ScraperInfo.from_status_line()` returns zero counts, no update time, and `unknown` status without parsing its input. Establish a status-data contract before implementing it, or deprecate it separately.
 - **Synchronization:** Job IDs and timestamps are retained, but automatic freshness detection, historical Index/Jobs access, and complete reconciliation are unimplemented. See the checkpoint caveat in [API-DOCUMENTATION.md](API-DOCUMENTATION.md#index-and-jobs-parsing).

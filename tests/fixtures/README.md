@@ -1,4 +1,4 @@
-# Response Fixtures
+# Response fixtures
 
 These reduced, anonymized fixtures have recorded provenance from read-only checks
 on 2026-10-13 against `/docs/Index/CH_BGer/last`, `/docs/Jobs/CH_BPatG/last`,
