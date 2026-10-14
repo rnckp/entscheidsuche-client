@@ -204,16 +204,37 @@ live mappings.
 Run local checks from the repository root:
 
 ```bash
+uv sync
+uv run pre-commit install
 uv run ruff format --check .
 uv run ruff check .
 uv run pytest
+uv run pre-commit run --all-files
+uv build --force-pep517
 ```
 
 Run `uv run pytest --live-api tests/test_api_live.py` to explicitly opt into a
 small read-only live contract check. Default tests make no network requests.
 
-Use `uv run ruff format .` to apply formatting. Dependabot is configured in
-`.github/dependabot.yml`; there is no checked-in CI workflow or pre-commit setup.
+Use `uv run ruff format .` to apply formatting. Local hooks run locked Ruff lint
+with safe fixes and formatting on staged Python files and notebooks, plus YAML/JSON,
+conflict, private-key, whitespace, and 1 MB added-file checks. Gitleaks scans staged
+changes for credentials. The first hook run downloads reusable environments;
+subsequent commits use them. Run `uv sync` first, since Ruff hooks use `--no-sync`.
+Review and stage any hook fixes before committing again.
+
+CI runs these hooks, offline tests, distribution builds, and an installed-wheel
+import check on Python 3.12. Separate jobs test Python 3.13 and 3.14 without repeating
+lint or builds. Jobs use cached uv environments, read-only permissions, ten-minute
+timeouts, and cancellation of superseded runs. Gitleaks is skipped in CI because
+its hook scans staged changes; enable GitHub secret scanning and push protection
+for remote commits.
+
+A separate dependency audit runs for dependency changes, weekly, or manually via
+`uv audit --locked --preview-features audit-command`. Dependabot monitors uv,
+GitHub Actions, and external hooks weekly, groups routine updates, and applies a
+seven-day cooldown. Require `Quality`, `Python 3.13`, and `Python 3.14` in branch
+protection after verifying hosted CI; do not require the path-filtered audit.
 Contributor policies are in [AGENTS.md](AGENTS.md).
 
 ## Fair Use
