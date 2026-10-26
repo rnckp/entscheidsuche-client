@@ -14,3 +14,7 @@ the [client guide](docs/client-guide.md); open work is in [PLAN.md](PLAN.md).
 - A prior review recorded Index `/last` checkpoints months older than Jobs `/last` on 2026-10-13. The reduced fixtures retain representative checkpoint fields, but do not reproduce all sampled responses or establish current freshness. Preserve job IDs and timestamps when synchronizing; do not infer freshness from HTTP success.
 - Scraper identities and court hierarchy IDs differ (e.g. `CH_BPatG` versus `CH_PATG`). Unknown scraper names must not be guessed from court IDs. Use `get_facets()` for service-provided hierarchy-to-scraper mappings.
 - Returned hits/documents must carry the configured docs endpoint through conversion and URL generation, with the same path validation as client getters. `cache_dir` remains accepted only for compatibility; it performs no caching.
+
+## eMudhra/emSign patch, 2026-10-26
+
+The affected certifi lock and environment now require at least 2026.10.19. Newer secure versions were preserved. Keep the existing seven-day cooldown. Remove only the incident package exemptions after certifi artifacts age seven days (2026-10-27 after 03:24:17 CET). Retain the security minimums. See the workspace SECURITY-PATCH-2026-10-26.md report for verification and scope.
