@@ -35,9 +35,10 @@ dev = [
 ]
 
 [tool.uv]
-constraint-dependencies = ["certifi>=2026.10.19"]
-# eMudhra/emSign security fix; retain while the cutoff excludes the patched release.
-exclude-newer-package = { certifi = false }
+constraint-dependencies = ["certifi>=2026.10.19", "virtualenv>=21.14.13"]
+# Security fixes (certifi: eMudhra/emSign; virtualenv: GHSA-cx6f-vjhg-g3cc); retain while the
+# cutoff excludes the patched releases.
+exclude-newer-package = { certifi = false, virtualenv = false }
 exclude-newer = "7 days"
 
 [tool.pytest.ini_options]
