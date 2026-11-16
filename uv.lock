@@ -15,13 +15,11 @@ exclude-newer = "0001-01-01T00:00:00Z" # This has no effect and is included for 
 exclude-newer-span = "P7D"
 
 [options.exclude-newer-package]
-certifi = false
 tornado = false
 virtualenv = false
 
 [manifest]
 constraints = [
-    { name = "certifi", specifier = ">=2026.10.19" },
     { name = "tornado", specifier = ">=6.6.1" },
     { name = "virtualenv", specifier = ">=21.14.13" },
 ]
