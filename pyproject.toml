@@ -35,10 +35,14 @@ dev = [
 ]
 
 [tool.uv]
-constraint-dependencies = ["certifi>=2026.10.19", "virtualenv>=21.14.13"]
-# Security fixes (certifi: eMudhra/emSign; virtualenv: GHSA-cx6f-vjhg-g3cc); retain while the
-# cutoff excludes the patched releases.
-exclude-newer-package = { certifi = false, virtualenv = false }
+constraint-dependencies = [
+    "certifi>=2026.10.19",
+    "tornado>=6.6.1",
+    "virtualenv>=21.14.13",
+]
+# Security fixes (certifi: eMudhra/emSign; tornado: GHSA-5cjw-f85j-cv6r;
+# virtualenv: GHSA-cx6f-vjhg-g3cc); retain while the cutoff excludes the patched releases.
+exclude-newer-package = { certifi = false, tornado = false, virtualenv = false }
 exclude-newer = "7 days"
 
 [tool.pytest.ini_options]
